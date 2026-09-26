@@ -9,6 +9,7 @@ import {
   buildMarkdownFallbackExtractorForTest,
   buildResponseObserverExpressionForTest,
   buildStopButtonVisibilityExpressionForTest,
+  captureAssistantMarkdown,
   classifyTurnTerminal,
   createTerminalGateState,
   hasScopedCompletionProof,
@@ -893,4 +894,18 @@ describe("answer-now placeholder detection", () => {
       expect(runInPage(text)).toBe(true);
     });
   });
+});
+
+test("strips content-reference tokens from copied Markdown", async () => {
+  const runtime = {
+    evaluate: async () => ({
+      result: {
+        value: {
+          success: true,
+          markdown: 'marmalade-otter-42 :chatgpt-content-reference{index="0"}\n2',
+        },
+      },
+    }),
+  } as unknown as Parameters<typeof captureAssistantMarkdown>[0];
+  expect(await captureAssistantMarkdown(runtime, {}, () => {})).toBe("marmalade-otter-42\n2");
 });

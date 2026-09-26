@@ -487,7 +487,7 @@ export async function captureAssistantMarkdown(
     awaitPromise: true,
   });
   if (result?.value?.success && typeof result.value.markdown === "string") {
-    return result.value.markdown;
+    return result.value.markdown.replace(/[\t ]*:chatgpt-content-reference\{[^}]*\}/g, "");
   }
   const status = result?.value?.status;
   if (status && status !== "missing-button") {
