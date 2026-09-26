@@ -23,6 +23,8 @@ export const INPUT_SELECTORS = [
 ];
 
 export const ANSWER_SELECTORS = [
+  '[data-chatgpt-search-unit-key$=":assistant"]',
+  '[data-content-search-unit-key$=":assistant"]',
   'article[data-testid^="conversation-turn"][data-message-author-role="assistant"]',
   'article[data-testid^="conversation-turn"][data-turn="assistant"]',
   'article[data-testid^="conversation-turn"] [data-message-author-role="assistant"]',
@@ -38,10 +40,13 @@ export const CONVERSATION_TURN_SELECTOR =
   'article[data-testid^="conversation-turn"], div[data-testid^="conversation-turn"], section[data-testid^="conversation-turn"], ' +
   "article[data-message-author-role], div[data-message-author-role], section[data-message-author-role], " +
   "article[data-turn], div[data-turn], section[data-turn], [data-turn-key]";
+// Search units are individual messages; data-turn-key wraps the whole exchange.
 export const CONVERSATION_TURN_CONTAINER_SELECTOR =
-  '[data-testid^="conversation-turn"], [data-turn-key]';
+  '[data-testid^="conversation-turn"], [data-content-search-unit-key], [data-chatgpt-search-unit-key]';
+export const USER_ROLE_SELECTOR =
+  '[data-message-author-role="user"], [data-turn="user"], [data-content-search-unit-key$=":user"], [data-chatgpt-search-unit-key$=":user"]';
 export const ASSISTANT_ROLE_SELECTOR =
-  '[data-message-author-role="assistant"], [data-turn="assistant"], [data-chatgpt-search-unit-key$=":assistant"]';
+  '[data-message-author-role="assistant"], [data-turn="assistant"], [data-content-search-unit-key$=":assistant"], [data-chatgpt-search-unit-key$=":assistant"]';
 export const CLOUDFLARE_SCRIPT_SELECTOR = 'script[src*="/challenge-platform/"]';
 export const CLOUDFLARE_TITLE = "just a moment";
 export const PROMPT_PRIMARY_SELECTOR = "#prompt-textarea";
@@ -92,9 +97,10 @@ export const SEND_BUTTON_SELECTORS = [
 ];
 export const SEND_BUTTON_SELECTOR = SEND_BUTTON_SELECTORS[0];
 export const MODEL_BUTTON_SELECTOR =
-  '[data-testid="model-switcher-dropdown-button"], button.__composer-pill[aria-haspopup="menu"], button[data-codex-intelligence-trigger="true"][aria-haspopup="menu"]';
+  '[data-testid="model-switcher-dropdown-button"], button.__composer-pill[aria-haspopup="menu"], button[data-codex-intelligence-trigger="true"][aria-haspopup="menu"], button[aria-label="Select ChatGPT model"]';
 export const COMPOSER_MODEL_SIGNAL_SELECTOR = '[data-testid="composer-footer-actions"]';
-export const COPY_BUTTON_SELECTOR = 'button[data-testid="copy-turn-action-button"]';
+export const COPY_BUTTON_SELECTOR =
+  'button[data-testid="copy-turn-action-button"]:not([data-markdown-copy] *), button[aria-label="Copy"]:not([data-markdown-copy] *)';
 // Action buttons that only appear once a turn has finished rendering.
 export const DEEP_RESEARCH_PLUS_BUTTON = '[data-testid="composer-plus-btn"]';
 export const DEEP_RESEARCH_DROPDOWN_ITEM_TEXT = "Deep research";
@@ -103,4 +109,5 @@ export const DEEP_RESEARCH_POLL_INTERVAL_MS = 5_000;
 export const DEEP_RESEARCH_AUTO_CONFIRM_WAIT_MS = 70_000;
 export const DEEP_RESEARCH_DEFAULT_TIMEOUT_MS = 2_400_000;
 export const FINISHED_ACTIONS_SELECTOR =
-  'button[data-testid="copy-turn-action-button"], button[data-testid="good-response-turn-action-button"], button[data-testid="bad-response-turn-action-button"], button[aria-label="Share"]';
+  COPY_BUTTON_SELECTOR +
+  ', button[data-testid="good-response-turn-action-button"], button[data-testid="bad-response-turn-action-button"], button[aria-label="Share"], button[aria-label="Read aloud"], button[aria-label="Regenerate response"]';

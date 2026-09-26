@@ -55,6 +55,10 @@ export class FakeElement {
     return this.attributes[name] ?? null;
   }
 
+  contains(element: FakeElement): boolean {
+    return this === element || this.children.some((child) => child.contains(element));
+  }
+
   closest(selector: string): FakeElement | null {
     if (matchesSelector(this, selector)) return this;
     return this.parentElement?.closest(selector) ?? null;
@@ -104,7 +108,18 @@ function matchesSelector(element: FakeElement, selector: string): boolean {
 }
 
 function matchesSingleSelector(element: FakeElement, selector: string): boolean {
+  for (const [, excluded] of selector.matchAll(/:not\(([^)]*)\)/g)) {
+    if (
+      excluded.endsWith(" *")
+        ? element.parentElement?.closest(excluded.slice(0, -2))
+        : matchesSingleSelector(element, excluded)
+    )
+      return false;
+  }
   const normalized = selector.replace(/:not\([^)]*\)/g, "");
+  for (const [, className] of normalized.replace(/\[[^\]]*\]/g, "").matchAll(/\.([a-z0-9_-]+)/gi)) {
+    if (!(element.getAttribute("class") ?? "").split(/\s+/).includes(className)) return false;
+  }
   const tag = normalized.match(/^[a-z][a-z0-9-]*/i)?.[0];
   if (tag && element.tagName.toLowerCase() !== tag.toLowerCase()) return false;
 

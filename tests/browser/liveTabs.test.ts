@@ -1,3 +1,14 @@
+import {
+  buildAssistantSnapshotExpressionForTest,
+  buildCompletionVisibilityExpressionForTest,
+} from "../../src/browser/actions/assistantResponse.js";
+import { COPY_BUTTON_SELECTOR } from "../../src/browser/constants.js";
+import {
+  browserPromptFingerprint,
+  readSubmittedPromptFingerprint,
+  readUserMessageIds,
+} from "../../src/browser/promptFingerprint.js";
+import type { ChromeClient } from "../../src/browser/types.js";
 import { describe, expect, test } from "vitest";
 import {
   buildTabInspectionExpressionForTest,
@@ -40,6 +51,114 @@ function makeTab(overrides: Partial<ChatGptTabSummary> = {}): ChatGptTabSummary 
 }
 
 describe("liveTabs helpers", () => {
+  test("captures the keyed exchange without mistaking code Copy for completion", async () => {
+    const user = new FakeElement("div", { "data-chatgpt-search-unit-key": "turn-0:user" }, [
+      new FakeElement("div", { class: "whitespace-pre-wrap" }, [], "Question\nwith an attachment"),
+    ]);
+    const codeCopy = new FakeElement("button", { "aria-label": "Copy" });
+    const assistant = new FakeElement(
+      "div",
+      { "data-chatgpt-search-unit-key": "turn-0:assistant" },
+      [
+        new FakeElement("span", { class: "sr-only" }, [], "ChatGPT said:\n"),
+        new FakeElement("p", {}, [], "The answer is 42.\n"),
+        new FakeElement("div", { "data-markdown-copy": "" }, [
+          new FakeElement("pre", {}, [], "print(42)"),
+          codeCopy,
+        ]),
+      ],
+    );
+    const exchange = new FakeElement("div", { "data-turn-key": "turn-0" }, [user, assistant]);
+    const document = new FakeDocument([exchange]);
+    const order = [exchange, user, ...user.children, assistant, ...assistant.children];
+    for (const node of order)
+      Object.assign(node, {
+        compareDocumentPosition: (other: FakeElement) =>
+          order.indexOf(other) > order.indexOf(node) ? 4 : 2,
+      });
+    const evaluate = (expression: string) =>
+      new Function(
+        "document",
+        "Element",
+        "HTMLElement",
+        "window",
+        "location",
+        `return ${expression}`,
+      )(
+        document,
+        FakeElement,
+        FakeElement,
+        { getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }) },
+        { href: "https://chatgpt.com/c/current" },
+      );
+    const runtime = {
+      evaluate: async ({ expression }: { expression: string }) => ({
+        result: { value: evaluate(expression) },
+      }),
+    } as unknown as ChromeClient["Runtime"];
+
+    expect(document.querySelector(COPY_BUTTON_SELECTOR)).toBeNull();
+    expect(evaluate(buildCompletionVisibilityExpressionForTest({}, 0))).toBe(false);
+    const turnCopy = new FakeElement("button", { "aria-label": "Copy" });
+    assistant.append(
+      new FakeElement("div", {}, [
+        turnCopy,
+        ...["Share", "Read aloud", "Regenerate response"].map(
+          (label) => new FakeElement("button", { "aria-label": label }),
+        ),
+      ]),
+    );
+    expect(document.querySelector(COPY_BUTTON_SELECTOR)).toBe(turnCopy);
+    expect(evaluate(buildCompletionVisibilityExpressionForTest({}, 0))).toBe(true);
+    expect(evaluate(buildAssistantSnapshotExpressionForTest(0))).toMatchObject({
+      text: "The answer is 42.\nprint(42)",
+      turnIndex: 1,
+    });
+    const observed = evaluate(buildTabInspectionExpressionForTest());
+    expect(observed.lastUserMessageId).toBe("turn-0:user");
+    expect(observed.lastUserTextRaw).toBe("Question\nwith an attachment");
+    expect(observed.lastUserTurnIndex).toBe(0);
+    expect(observed.lastAssistantTurnIndex).toBe(1);
+    expect(observed.assistantFollowsLatestUser).toBe(true);
+    expect(await readUserMessageIds(runtime)).toEqual(["turn-0:user"]);
+    expect(await readSubmittedPromptFingerprint(runtime, [])).toBe(
+      browserPromptFingerprint("Question\nwith an attachment", "turn-0:user"),
+    );
+  });
+
+  test("pairs current search-unit user and assistant turns", () => {
+    const user = new FakeElement(
+      "div",
+      { "data-content-search-unit-key": "fallback-turn-0:0:user" },
+      [new FakeElement("div", { class: "whitespace-pre-wrap" }, [], "Question")],
+    );
+    const assistant = new FakeElement(
+      "div",
+      { "data-content-search-unit-key": "fallback-turn-0:1:assistant" },
+      [new FakeElement("div", { class: "markdown" }, [], "Answer")],
+    );
+    Object.assign(user, {
+      compareDocumentPosition: (other: FakeElement) => (other === assistant ? 4 : 2),
+    });
+    const observed = new Function(
+      "document",
+      "Element",
+      "window",
+      "location",
+      `return ${buildTabInspectionExpressionForTest()}`,
+    )(
+      new FakeDocument([user, assistant]),
+      FakeElement,
+      { getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }) },
+      { href: "https://chatgpt.com/c/current" },
+    );
+    expect(observed.lastUserMessageId).toBe("fallback-turn-0:0:user");
+    expect(observed.lastUserTextRaw).toBe("Question");
+    expect(observed.lastUserContentText).toBe("Question");
+    expect(observed.lastAssistantText).toBe("Answer");
+    expect(observed.assistantFollowsLatestUser).toBe(true);
+  });
+
   test("keeps speaker labels and controls out of the raw user fingerprint text", () => {
     const text = "if active:\n  run()";
     const user = new FakeElement(
